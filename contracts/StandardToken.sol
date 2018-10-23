@@ -53,15 +53,15 @@ contract StandardToken is ERC20Interface {
     // the following variables need to be here for scoping to properly freeze normal transfers after migration has started
     // migrationStart flag
     bool public migrationStart;
-    // var for storing the the TimeLock contract deployment address (for vesting FIN allocations)
-    // TimeLock timeLockContract;
+    // var for storing the the TimeLock contract deployment address (for vesting GTX allocations)
+    TimeLock timeLockContract;
 
     /**
      * @dev Modifier for allowing only TimeLock transactions to occur after the migration period has started
     */
     modifier migrateStarted {
         if(migrationStart == true){
-            // require(msg.sender == address(timeLockContract));
+            require(msg.sender == address(timeLockContract));
         }
         _;
     }

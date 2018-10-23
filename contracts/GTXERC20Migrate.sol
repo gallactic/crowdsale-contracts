@@ -52,7 +52,7 @@ contract GTXERC20Migrate is Ownable {
     }
 
     // Note: _totalMigratableGTX is a running total of GTX, migratable in this contract,
-    // but does not represent the actual amount of FIN migrated to the Gallactic network
+    // but does not represent the actual amount of GTX migrated to the Gallactic network
     event GTXRecordUpdate(
         address indexed _recordAddress,
         uint256 _totalMigratableGTX

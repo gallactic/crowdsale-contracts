@@ -94,18 +94,18 @@ contract GTXToken is StandardToken, Ownable{
         require(_gtxPresale != address(0), "Must provide a PreSale address");
         require(_gtxPresale.getStage() > 0, "Presale must have already set its allocation");
         require(_gtxRecord.maxRecords().add(_gtxPresale.totalPresaleTokens()) <= _totalSupply, "Records & PreSale allocation exceeds the proposed total supply");
-        
+
         totalSupply_ = _totalSupply; // unallocated until passAuctionAllocation is called
         gtxRecord = _gtxRecord;
         gtxPresale = _gtxPresale;
     }
 
     /**
-    * @dev Fallback reverts any ETH payment 
+    * @dev Fallback reverts any ETH payment
     */
     function () public payable {
-        revert (); 
-    }  
+        revert ();
+    }
 
     /**
     * @dev Safety function for reclaiming ERC20 tokens
@@ -149,7 +149,7 @@ contract GTXToken is StandardToken, Ownable{
     */
     function setTimeLockAddress(TimeLock _timeLockContract) public onlyOwner returns (bool) {
         require(_timeLockContract != address(0), "Must provide a TimeLock address");
-        // check that this FIN ERC20 deployment is the TimeLock contract's attached ERC20 token
+        // check that this GTX ERC20 deployment is the TimeLock contract's attached ERC20 token
         require(_timeLockContract.ERC20() == address(this), "TimeLock contract does not have this token assigned");
 
         timeLockContract = _timeLockContract;
@@ -163,7 +163,7 @@ contract GTXToken is StandardToken, Ownable{
     */
     function startMigration() onlyOwner public returns (bool) {
         require(migrationStart == false, "startMigration has already been run");
-        // check that the FIN migration contract address is set
+        // check that the GTX migration contract address is set
         require(gtxMigrationContract != address(0), "Migration contract address must be set");
         // check that the GTX Auction contract address is set
         require(gtxAuctionContract != address(0), "Auction contract address must be set");
