@@ -56,7 +56,6 @@ contract GTXToken is StandardToken, Ownable{
     GTXRecord public gtxRecord;
     GTXPresale public gtxPresale;
     uint256 public totalAllocation;
-    bool public migrationStart;
 
     // var for storing the the GTXRC20Migrate contract deployment address (for migration to the GALLACTIC network)
     TimeLock timeLockContract;

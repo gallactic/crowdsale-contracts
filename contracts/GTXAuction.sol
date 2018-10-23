@@ -111,7 +111,7 @@ contract GTXAuction is Ownable {
     }
 
     modifier timedTransitions() {
-        if (stage == Stages.AuctionStarted && block.number >= endBlock) {
+        if (stage == Stages.AuctionStarted && block.number >= endBlock.add(waitingPeriod)) {
             finalizeAuction();
             stage = Stages.ClaimingStarted;
         }
@@ -396,7 +396,8 @@ contract GTXAuction is Ownable {
 
         stage = Stages.AuctionEnded;
         if (block.number < endBlock){
-            finalPrice = calcTokenPrice(block.number);
+            uint256 currentBlock = block.number.sub(startBlock);
+            finalPrice = calcTokenPrice(currentBlock);
         } else {
             finalPrice = calcTokenPrice(biddingPeriod);
         }
