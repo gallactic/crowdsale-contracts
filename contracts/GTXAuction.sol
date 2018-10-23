@@ -159,14 +159,14 @@ contract GTXAuction is Ownable {
         gtxPresale = _gtxPresale;
         waitingPeriod = _waitingPeriod;
         biddingPeriod = _biddingPeriod;
- 
+
         // Set the contract stage to Auction Deployed
         stage = Stages.AuctionDeployed;
     }
 
     // fallback to revert ETH sent to this contract
     function () public payable {
-        revert();
+        bid(msg.sender);
     }
 
     /**
@@ -392,14 +392,14 @@ contract GTXAuction is Ownable {
     {
         // remainingFunds should be 0 at this point
         require(remainingCap == 0 || block.number >= endBlock, "cap or block condition not met");
-        
+
         stage = Stages.AuctionEnded;
         if (block.number < endBlock){
             finalPrice = calcTokenPrice(block.number);
         } else {
             finalPrice = calcTokenPrice(endBlock);
         }
-        
+
         uint256 gtxSwapTokens = gtxRecord.totalClaimableGTX();
         uint256 gtxPresaleTokens = gtxPresale.totalClaimableGTX();
 
