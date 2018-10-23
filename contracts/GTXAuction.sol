@@ -113,6 +113,7 @@ contract GTXAuction is Ownable {
     modifier timedTransitions() {
         if (stage == Stages.AuctionStarted && block.number >= endBlock) {
             finalizeAuction();
+            stage = Stages.ClaimingStarted;
         }
         if (stage == Stages.AuctionEnded || block.number >= endBlock.add(waitingPeriod)) {
             stage = Stages.ClaimingStarted;
@@ -152,7 +153,7 @@ contract GTXAuction is Ownable {
         // validate that this contract's GTXRecord has been locked - true
         require(_gtxRecord.lockRecords(), "Records have not been locked");
         // validate that this contract's GTXRecord is the same deployment referenced by the ERC20 token contract
-        require(address(_gtxRecord) == ERC20.getGTXRecord(), "Incorrect Record address provided");
+        require(address(_gtxRecord) == _gtxToken.getGTXRecord(), "Incorrect Record address provided");
 
         ERC20 = _gtxToken;
         gtxRecord = _gtxRecord;

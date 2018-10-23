@@ -28,6 +28,7 @@ pragma solidity 0.4.25;
 *  We have inherited ERC20Interface instead of Token contract and included additional functions say increaseApproval() and decreaseApproval() to the StandardToken
 */
 
+import "./TimeLock.sol"
 import "./ERC20Interface.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
