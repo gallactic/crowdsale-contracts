@@ -398,17 +398,9 @@ contract GTXAuction is Ownable {
         if (block.number < endBlock){
             finalPrice = calcTokenPrice(block.number);
         } else {
-            finalPrice = calcTokenPrice(endBlock);
+            finalPrice = calcTokenPrice(biddingPeriod);
         }
 
-        uint256 gtxSwapTokens = gtxRecord.totalClaimableGTX();
-        uint256 gtxPresaleTokens = gtxPresale.totalClaimableGTX();
-
-        uint256 claimableTokens = totalAuctionTokens.add(gtxSwapTokens).add(gtxPresaleTokens);
-
-        // Total tokens to transfer will be Max Tokens minus the total claimable tokens
-        uint256 ownerTokens = maxTokens.sub(claimableTokens);
-        ERC20.transfer(owner(), ownerTokens);
         endBlock = block.number;
     }
 
