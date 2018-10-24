@@ -167,7 +167,7 @@ contract GTXAuction is Ownable {
         biddingPeriod = _biddingPeriod;
 
         uint256 gtxSwapTokens = gtxRecord.totalClaimableGTX();
-        uint256 gtxPresaleTokens = gtxPresale.totalClaimableGTX();
+        uint256 gtxPresaleTokens = gtxPresale.totalPresaleTokens();
         maxTotalClaim = maxTotalClaim.add(gtxSwapTokens).add(gtxPresaleTokens);
 
         // Set the contract stage to Auction Deployed
