@@ -60,6 +60,7 @@ contract GTXAuction is Ownable {
     uint256 public maxTokens; // the maximum number of tokens for distribution during the auction
     uint256 public remainingCap; // Remaining amount in wei to reach the hardcap target
     uint256 public totalReceived; // Keep track of total ETH in Wei received during the bidding phase
+    uint256 public maxTotalClaim; // a running total of the maximum possible tokens that can be claimed by bidder (including bonuses)
     uint256 public totalAuctionTokens; // Total tokens for the accumulated bid amount and the bonus
     uint256 public fundsClaimed;  // Keep track of cumulative ETH funds for which the tokens have been claimed
 
@@ -82,7 +83,7 @@ contract GTXAuction is Ownable {
     mapping (address => uint256) public bids; // total bids in wei per account
     mapping (address => uint256) public bidTokens; // tokens calculated for the submitted bids
     mapping (address => uint256) public totalTokens; // total tokens is the accumulated tokens of bidTokens, presaleTokens, gtxrecordTokens and bonusTokens
-    mapping (address => bool) public calimedStatus; // calimedStatus is the claimed status of the user
+    mapping (address => bool) public claimedStatus; // claimedStatus is the claimed status of the user
 
     // Auction arrays for bid amount based Bonus calculation
     uint256[11] public bonusPercent; // 11 possible bonus percentages (with values 0 - 100 each)
@@ -99,7 +100,8 @@ contract GTXAuction is Ownable {
         AuctionSetUp,
         AuctionStarted,
         AuctionEnded,
-        ClaimingStarted
+        ClaimingStarted,
+        ClaimingEnded
     }
 
     /*
@@ -117,6 +119,9 @@ contract GTXAuction is Ownable {
         }
         if (stage == Stages.AuctionEnded || block.number >= endBlock.add(waitingPeriod)) {
             stage = Stages.ClaimingStarted;
+        }
+        if(fundsClaimed == totalReceived) {
+            stage = Stages.ClaimingEnded;
         }
         _;
     }
@@ -160,7 +165,11 @@ contract GTXAuction is Ownable {
         gtxPresale = _gtxPresale;
         waitingPeriod = _waitingPeriod;
         biddingPeriod = _biddingPeriod;
-
+        
+        uint256 gtxSwapTokens = gtxRecord.totalClaimableGTX();
+        uint256 gtxPresaleTokens = gtxPresale.totalClaimableGTX();
+        maxTotalClaim = maxTotalClaim.add(gtxSwapTokens).add(gtxPresaleTokens);
+        
         // Set the contract stage to Auction Deployed
         stage = Stages.AuctionDeployed;
     }
@@ -174,8 +183,13 @@ contract GTXAuction is Ownable {
     * @dev Safety function for reclaiming ERC20 tokens
     * @param _token address of the ERC20 contract
     */
-    function recoverLost(ERC20Interface _token) public onlyOwner {
-        _token.transfer(owner(), _token.balanceOf(this));
+    function recoverTokens(ERC20Interface _token) external onlyOwner {
+        require(stage >= 3, "auction bidding must be ended to recover");
+        if(isStage(Stages.AuctionEnded) || isStage(Stages.ClaimingStarted)) {
+            token.transfer(owner(), _token.balanceOf(address(this)).sub(maxTotalClaim));
+        } else {
+            _token.transfer(owner(), _token.balanceOf(address(this)));
+        }
     }
 
     ///  @dev Function to whitelist participants during the crowdsale
@@ -227,7 +241,7 @@ contract GTXAuction is Ownable {
         require(_etherPrice > 0,"Ether price should be > 0");
         require(_hardCap > 0,"Hard Cap should be > 0");
         require(_floor < _ceiling,"Floor must be strictly less than the ceiling");
-        require(_bonusPercent.length == _bonusThreshold.length, "Length of bonus percent array and bonus threshold should be equal");
+        require(_bonusPercent.length == 11 && _bonusThreshold.length == 11, "Length of bonus percent array and bonus threshold should be 11");
 
         maxTokens = _maxTokens;
         etherPrice = _etherPrice;
@@ -306,6 +320,16 @@ contract GTXAuction is Ownable {
         endBlock = startBlock.add(biddingPeriod);
     }
 
+    /// @dev Implements a moratorium on claiming so that company can eventually recover all remaining tokens (in case of lost accounts who can/will never claim) - any remaining claims must contact the company directly
+    function endClaim()
+        public
+        onlyOwner
+        atStage(Stages.ClaimingStarted)
+    {
+        // set the stage to Claiming Ended
+        stage = Stages.ClaimingEnded;
+    }
+
     /// @dev Allows to send a bid to the auction.
     /// @param _receiver Bid will be assigned to this address if set.
     function bid(address _receiver)
@@ -325,6 +349,11 @@ contract GTXAuction is Ownable {
         require(msg.value <= maxWei, "Hardcap limit will be exceeded");
 
         bids[_receiver] = bids[_receiver].add(msg.value);
+        
+        uint256 maxAcctClaim = bids[_receiver].mul(calcTokenPrice(endBlock)); // max claimable tokens given bids total amount
+        maxAcctClaim = bonusPercent[10].mul(maxAcctClaim).div(100); // max claimable tokens (including bonus)
+        maxTotalClaim = maxTotalClaim.add(maxAcctClaim); // running total of max claim liability
+        
         totalReceived = totalReceived.add(msg.value);
         remainingCap = hardCap.sub(totalReceived);
         if(remainingCap == 0){
@@ -341,22 +370,22 @@ contract GTXAuction is Ownable {
         onlyWhitelisted(msg.sender)
         atStage(Stages.ClaimingStarted)
     {
-        require(!calimedStatus[msg.sender], "User already claimed");
+        require(!claimedStatus[msg.sender], "User already claimed");
         // validate that GTXPresale contract has been locked - set to true
         require(gtxPresale.lockRecords(), "presale record updating must be locked");
 
+        // Update the total amount of ETH funds for which tokens have been claimed
+        fundsClaimed = fundsClaimed.add(bids[msg.sender]);
+
         //total tokens accumulated for an user
         uint256 accumulatedTokens = calculateTokens(msg.sender);
-
-        // Update the total amount of funds for which tokens have been claimed
-        fundsClaimed = fundsClaimed.add(accumulatedTokens);
 
         // Set receiver bid to 0 before assigning tokens
         bids[msg.sender] = 0;
         totalTokens[msg.sender] = 0;
 
         require(ERC20.transfer(msg.sender, accumulatedTokens), "transfer failed");
-        calimedStatus[msg.sender] = true;
+        claimedStatus[msg.sender] = true;
 
         emit ClaimedTokens(msg.sender, accumulatedTokens);
         assert(bids[msg.sender] == 0);
@@ -396,10 +425,9 @@ contract GTXAuction is Ownable {
 
         stage = Stages.AuctionEnded;
         if (block.number < endBlock){
-            uint256 currentBlock = block.number.sub(startBlock);
-            finalPrice = calcTokenPrice(currentBlock);
+            finalPrice = calcTokenPrice(block.number);
         } else {
-            finalPrice = calcTokenPrice(biddingPeriod);
+            finalPrice = calcTokenPrice(block.number);
         }
 
         endBlock = block.number;
@@ -422,8 +450,12 @@ contract GTXAuction is Ownable {
     /// @param _bidBlock is the block number
     /// @return Returns the token price - Wei per GTX
     function calcTokenPrice(uint256 _bidBlock) public view returns(uint256){
-        uint256 decay = (_bidBlock ** 3).div(priceConstant);
-        return ceiling.mul(_bidBlock.add(1)).div(_bidBlock.add(decay).add(1));
+
+        require(_bidBlock >= startBlock && _bidBlock <= endBlock, "pricing only given in the range of startBlock and endBlock");
+
+        uint256 currentBlock = _bidBlock.sub(startBlock);
+        uint256 decay = (currentBlock ** 3).div(priceConstant);
+        return ceiling.mul(currentBlock.add(1)).div(currentBlock.add(decay).add(1));
     }
 
     /// @dev Returns correct stage, even if a function with a timedTransitions modifier has not been called yet
