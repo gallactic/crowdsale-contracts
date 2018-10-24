@@ -120,7 +120,7 @@ contract GTXAuction is Ownable {
         if (stage == Stages.AuctionEnded || block.number >= endBlock.add(waitingPeriod)) {
             stage = Stages.ClaimingStarted;
         }
-        if(fundsClaimed == totalReceived) {
+        if(stage == Stages.AuctionEnded && fundsClaimed == totalReceived) {
             stage = Stages.ClaimingEnded;
         }
         _;
@@ -165,11 +165,11 @@ contract GTXAuction is Ownable {
         gtxPresale = _gtxPresale;
         waitingPeriod = _waitingPeriod;
         biddingPeriod = _biddingPeriod;
-        
+
         uint256 gtxSwapTokens = gtxRecord.totalClaimableGTX();
         uint256 gtxPresaleTokens = gtxPresale.totalClaimableGTX();
         maxTotalClaim = maxTotalClaim.add(gtxSwapTokens).add(gtxPresaleTokens);
-        
+
         // Set the contract stage to Auction Deployed
         stage = Stages.AuctionDeployed;
     }
@@ -184,9 +184,9 @@ contract GTXAuction is Ownable {
     * @param _token address of the ERC20 contract
     */
     function recoverTokens(ERC20Interface _token) external onlyOwner {
-        require(stage >= 3, "auction bidding must be ended to recover");
-        if(isStage(Stages.AuctionEnded) || isStage(Stages.ClaimingStarted)) {
-            token.transfer(owner(), _token.balanceOf(address(this)).sub(maxTotalClaim));
+        require(uint(stage) >= 3, "auction bidding must be ended to recover");
+        if(currentStage() == 3 || currentStage() == 4) {
+            _token.transfer(owner(), _token.balanceOf(address(this)).sub(maxTotalClaim));
         } else {
             _token.transfer(owner(), _token.balanceOf(address(this)));
         }
@@ -349,11 +349,11 @@ contract GTXAuction is Ownable {
         require(msg.value <= maxWei, "Hardcap limit will be exceeded");
 
         bids[_receiver] = bids[_receiver].add(msg.value);
-        
+
         uint256 maxAcctClaim = bids[_receiver].mul(calcTokenPrice(endBlock)); // max claimable tokens given bids total amount
         maxAcctClaim = bonusPercent[10].mul(maxAcctClaim).div(100); // max claimable tokens (including bonus)
         maxTotalClaim = maxTotalClaim.add(maxAcctClaim); // running total of max claim liability
-        
+
         totalReceived = totalReceived.add(msg.value);
         remainingCap = hardCap.sub(totalReceived);
         if(remainingCap == 0){
