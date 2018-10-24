@@ -350,11 +350,12 @@ contract GTXAuction is Ownable {
 
         bids[_receiver] = bids[_receiver].add(msg.value);
 
-        uint256 maxAcctClaim = bids[_receiver].mul(calcTokenPrice(endBlock)); // max claimable tokens given bids total amount
+        uint256 maxAcctClaim = bids[_receiver].mul(WEI_FACTOR).div(calcTokenPrice(endBlock)); // max claimable tokens given bids total amount
         maxAcctClaim = bonusPercent[10].mul(maxAcctClaim).div(100); // max claimable tokens (including bonus)
         maxTotalClaim = maxTotalClaim.add(maxAcctClaim); // running total of max claim liability
 
         totalReceived = totalReceived.add(msg.value);
+
         remainingCap = hardCap.sub(totalReceived);
         if(remainingCap == 0){
             finalizeAuction(); // When maxWei is equal to the hardcap the auction will end and finalizeAuction is triggered.
