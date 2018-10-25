@@ -117,7 +117,7 @@ contract GTXAuction is Ownable {
             finalizeAuction();
             stage = Stages.ClaimingStarted;
         }
-        if (stage == Stages.AuctionEnded || block.number >= endBlock.add(waitingPeriod)) {
+        if (stage == Stages.AuctionEnded && block.number >= endBlock.add(waitingPeriod)) {
             stage = Stages.ClaimingStarted;
         }
         if(stage == Stages.AuctionEnded && fundsClaimed == totalReceived) {

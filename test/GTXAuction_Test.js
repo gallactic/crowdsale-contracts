@@ -2,6 +2,7 @@
 const assert = require('chai').assert;
 const sleep = require('sleep');
 require('chai').use(require('chai-as-promised')).should();
+const BigNumber = require('bignumber.js');
 
 /* Web 3 Objects */
 const Web3 = require('web3');
@@ -48,7 +49,7 @@ contract('Tests for GTX Auction contract ', function (accounts) {
     const MAX_TOKENS = 400000000 * WEI;     // 400 Million GTX Tokens for Auction
     const BIDDING_PERIOD = 524160;          // 91 Days
     const BIDDING_PERIOD_MIN = 8;           // 2 Minutes
-    const AUDIT_WAIT_PERIOD = 80640;        // 14 Days
+    const AUDIT_WAIT_PERIOD = 1;        // 1 Block just for testing
     const BONUS_THRESHOLD = [9900, 15000, 35000, 50000, 100000, 1000000, 2500000, 5000000, 10000000, 25000000, 100000000]; // Threshold for bonus in dollars
     const BONUS_PERCENT = [1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 32];
 
@@ -67,12 +68,11 @@ contract('Tests for GTX Auction contract ', function (accounts) {
     const AUCTION_SETUP = 1;                // Auction Setup is Stage 1
     const AUCTION_STARTED = 2;              // Auction Started is Stage 2
     const AUCTION_ENDED = 3;                // Auction Ended is Stage 3
-    const CLAIM_STARTED = 4;                // Claim Started is Stage 4
 
     //Presale contract variables
     const MAX_PRESALE_TOKENS = 200000000 * WEI;; //Maximum tokens to allocate to presale contract
     const BONUS_TOKENS_THRESHOLD = [300000000000000000000, 454545454545454560000, 1060606060606060500000, 1515151515151515200000, 3030303030303030500000, 30303030303030304000000, 75757575757575760000000, 151515151515151520000000, 303030303030303040000000, 757575757575757600000000, 3030303030303030300000000];
-
+    const PRESALE_DEPLOYED = 0;
 
     describe('GTX Record Contract Tests', function () {
 
@@ -83,11 +83,13 @@ contract('Tests for GTX Auction contract ', function (accounts) {
 
         it('Should create some swap records and lock the gtxrecord update', async function () {
             await recordContract.setConversionRate(SWAP_RATE);
-            await recordContract.recordUpdate(accounts[1], FIN_WITH_SWAP, true, { from: accounts[0] });
-            await recordContract.recordUpdate(accounts[2], FIN, false, { from: accounts[0] });
+            await recordContract.recordUpdate(accounts[1], FIN, false, { from: accounts[0] });
+            await recordContract.recordUpdate(accounts[2], FIN_WITH_SWAP, true, { from: accounts[0] });
             await recordContract.recordUpdate(accounts[16], FIN, false, { from: accounts[0] });
             await recordContract.recordUpdate(accounts[17], FIN, false, { from: accounts[0] });
             await recordContract.lock();
+            let lockedState = await recordContract.lockRecords.call();
+            assert.equal(lockedState,true,"lock state should be true")
         });
 
         it('Should get the total swap', async function () {
@@ -98,6 +100,7 @@ contract('Tests for GTX Auction contract ', function (accounts) {
 
         it('Should set up the initial parameters', async function () {
             let stage = await presaleContract.getStage();
+            assert.equal(stage,PRESALE_DEPLOYED,"Stage should be presale deployed")
             await presaleContract.setup(MAX_PRESALE_TOKENS, BONUS_TOKENS_THRESHOLD, BONUS_PERCENT);
         })
 
@@ -111,6 +114,7 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             presaleTotal = await presaleContract.totalClaimableGTX();
             let calcTotal = (BONUS_TOKENS_THRESHOLD[0] + ((BONUS_PERCENT[0] * BONUS_TOKENS_THRESHOLD[0]) / 100)) + (BONUS_TOKENS_THRESHOLD[4] + ((BONUS_PERCENT[4] * BONUS_TOKENS_THRESHOLD[4]) / 100))
             assert.equal(calcTotal, presaleTotal, "Total should be equal for presale claimable")
+            let maxPresaleTokens = await presaleContract.totalPresaleTokens()
         })
 
     });
@@ -123,7 +127,7 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             timeLockContract = await timeLock.new(tokenContract.address);
             migrateContract = await gtxMigrate.new(tokenContract.address);
             auctionContract = await gtxAuction.new(
-                tokenContract.address, recordContract.address, presaleContract.address, BIDDING_PERIOD_MIN, AUDIT_WAIT_PERIOD
+                tokenContract.address, recordContract.address, presaleContract.address, BIDDING_PERIOD, AUDIT_WAIT_PERIOD
             );
         });
 
@@ -141,6 +145,22 @@ contract('Tests for GTX Auction contract ', function (accounts) {
     })
 
     describe('GTX Auction contract tests', function () {
+        let swtokens;
+        swtokens = new BigNumber(swtokens);
+        let prtokens;
+        prtokens = new BigNumber(prtokens);
+        let maxTotalClaim;
+        maxTotalClaim = new BigNumber(maxTotalClaim);
+        let totalTokens;
+        totalTokens = new BigNumber(totalTokens);
+        let maxClaimableTokens;
+        maxClaimableTokens = new BigNumber(maxClaimableTokens);
+        let tokenPrice;
+        tokenPrice = new BigNumber(tokenPrice);
+        let bids;
+        let totalSupply;
+        let acc1Balance;
+        acc1Balance = new BigNumber(acc1Balance);
 
         it('Should match the GTX ERC20 Token Contract from the GTX Auction contract', async function () {
             let erc20 = await auctionContract.ERC20();
@@ -148,6 +168,15 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             let stage = await auctionContract.stage.call();
             assert.equal(stage.toString(), AUCTION_DEPLOYED, "Auction Stage should be Auction Deployed");
         });
+
+        it('Max tokens should be equal to gtx record toatal and presale total', async function() {
+            swtokens = await recordContract.totalClaimableGTX()
+            prtokens = await presaleContract.totalPresaleTokens()
+
+            maxTotalClaim = await auctionContract.maxTotalClaim()
+            maxClaimableTokens = prtokens.plus(swtokens);
+            assert.equal(maxClaimableTokens, maxTotalClaim.toNumber())
+        })
 
         it('Should allow the owner to Setup the Auction', async function () {
             let presalestage = await presaleContract.stage()
@@ -159,31 +188,31 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             let floor = await auctionContract.floor.call();
             let stage = await auctionContract.stage.call();
             let priceConstant = await auctionContract.priceConstant.call();
-            assert.equal(priceConstant.toNumber(), 2, "Price Constant should be set");
+            assert.equal(priceConstant.toNumber(), 14460167444, "Price Constant should be set");
             assert.equal(stage.toString(), AUCTION_SETUP, "Auction Stage should be Auction Setup");
             assert.equal(ethPrice, ETHER_PRICE_2, "Ether Price Should be 300 USD");
             assert.equal((hardCap.toNumber() / WEI) * ETHER_PRICE_2, HARDCAP_2, "Hard Cap Should be 200 Million USD");
             assert.equal((ceiling.toNumber() / WEI) * ETHER_PRICE_2, CEILING_2, "Ceiling Price Should be 4 USD");
-            assert.equal((floor.toNumber() / WEI) * ETHER_PRICE_2, 19.99999999999998, "Floor Price Should be 0.2 USD");
+            let calfloor =  (floor.toNumber() / WEI) * ETHER_PRICE_2
+            calfloor = Number((calfloor).toFixed(0));
+            assert.equal(calfloor, FLOOR_2, "Floor Price Should be 0.2 USD");
         });
 
         it('Should pass Auction allocation only from the GTX Auction contract and check if the owner gets the remaining tokens', async function () {
 
-            let auctionAllocatedTokens = await tokenContract.getAuctionAllocation();
+            let maxtokens = await auctionContract.maxTokens()
+            maxtokens = new BigNumber(maxtokens)
+            calcAuctionTokens = swtokens.plus(prtokens).plus(maxtokens);
+            calcAuctionTokens = new BigNumber(calcAuctionTokens)
             let auctionContractBalance = await tokenContract.balanceOf(auctionContract.address);
-            assert.equal(auctionAllocatedTokens.toNumber(), auctionContractBalance.toNumber(),
+            assert.equal(calcAuctionTokens, auctionContractBalance.toNumber(),
                 "Should be equal to the sum of gtx swap tokens and auctionAllocated tokens");
 
-            let swtokens = await recordContract.totalClaimableGTX()
-            let prtokens = await presaleContract.totalPresaleTokens()
-            let maxtokens = await auctionContract.maxTokens()
-            calcAuctionTokens = swtokens.toNumber() + prtokens.toNumber() + maxtokens.toNumber()
-
-
-            let maxTokens = await tokenContract.totalSupply();
+            totalSupply = await tokenContract.totalSupply();
+            totalSupply = new BigNumber(totalSupply);
             let ownerTokens = await tokenContract.balanceOf(accounts[0])
-            let calcOwnerBal = TOTAL_SUPPLY - calcAuctionTokens;
-            assert.equal(maxTokens.toNumber(), TOTAL_SUPPLY, "Max tokens should be equal to the total supply")
+            let calcOwnerBal = totalSupply.minus(calcAuctionTokens);
+            assert.equal(totalSupply.toNumber(), TOTAL_SUPPLY, "Max tokens should be equal to the total supply")
             assert.equal(ownerTokens.toNumber(), calcOwnerBal, "Remaining tokens should be allocated to owner")
 
         });
@@ -198,7 +227,7 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             let stage = await auctionContract.stage.call();
             let newPriceConstant = await auctionContract.priceConstant.call();
 
-            assert.equal(newPriceConstant.toNumber(), 4, "New Price Constant should be set");
+            assert.equal(newPriceConstant.toNumber(), 19414401274, "New Price Constant should be set");
             assert.equal(stage.toString(), AUCTION_SETUP, "Auction Stage should be Auction Setup");
             assert.equal(newEthPrice, ETHER_PRICE, "New Ether Price Should be 250 USD");
             assert.equal((newHardCap.toNumber() / WEI) * ETHER_PRICE, HARDCAP, "New Hard Cap Should be 100 Million USD");
@@ -210,65 +239,137 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             await auctionContract.startAuction();
             let stage = await auctionContract.stage.call();
             assert.equal(stage.toString(), AUCTION_STARTED, "Auction Stage should be Auction Started");
+            let startblock = await auctionContract.startBlock.call();
+            let endBlock = await auctionContract.endBlock.call();
+            assert.equal(endBlock,startblock.toNumber()+BIDDING_PERIOD,"End block should be startBlock + bidding period")
         });
 
-        it('Should whitelist account1 and account2 ', async function () {
+        it('Should whitelist accounts', async function () {
             await auctionContract.addToWhitelist([accounts[1], accounts[2], accounts[3], accounts[4], accounts[16], accounts[17], accounts[18], accounts[19]]);
-            let isWhitelisted = await auctionContract.whitelist(accounts[1]);
-            assert.equal(isWhitelisted, true, "accounts[1] should be whitelisted")
+            let isWhitelisted = await auctionContract.whitelist(accounts[19]);
+            assert.equal(isWhitelisted, true, "accounts[19] should be whitelisted")
         })
 
-        it('Bidder1 Should place bid for 446428 ether', async function () {
+        it('Should remove from whitelists  ', async function () {
+            await auctionContract.removeFromWhitelist([accounts[19]]);
+            let isWhitelisted = await auctionContract.whitelist(accounts[19]);
+            assert.equal(isWhitelisted, false, "accounts[19] should be whitelisted")
+        })
+
+        it('Bidder1 Should place bid for hardcap ether', async function () {
             hardCap = await auctionContract.hardCap();
             await auctionContract.bid(accounts[1], { from: accounts[1], value: web3.utils.toBN(hardCap) });
+            let totalReceived = await auctionContract.totalReceived();
+            assert.equal(totalReceived.toNumber(),hardCap,"Total received should be equal to hardcap")
             let remainingCap = await auctionContract.remainingCap()
             assert.equal(remainingCap.toNumber(), 0, "remaining cap should be equal to 0");
         })
-        let blockNumber;
-        let tokenPrice;
+
         it('Should validate the token price and stage', async function () {
-            blockNumber = await web3.eth.getBlockNumber();
-            console.log("blockNumber",blockNumber)
-            sb = await auctionContract.startBlock();
-            cp = await auctionContract.calcTokenPrice(blockNumber);
-            console.log("jblocknumber",cp.toNumber() *ETHER_PRICE/WEI)
-            cb = blockNumber - sb;
-            console.log("cb",cb)
-            cp = await auctionContract.calcTokenPrice(cb);
-            console.log("current",cp.toNumber() *ETHER_PRICE/WEI)
             tokenPrice = await auctionContract.finalPrice();
-            console.log("tokenPrice", (tokenPrice.toNumber() *ETHER_PRICE)/WEI)
-            if (tokenPrice > 0.33) {
-                assert.notEqual(tokenPrice, 0, "Tokens price should not be equal to 0")
-            } else {
-                console.log("error")
-            }
+            console.log("tokenPrice", ((tokenPrice.toNumber() *ETHER_PRICE)/WEI)/100)
 
             let stage = await auctionContract.stage()
             assert.equal(stage, AUCTION_ENDED, "Stage should be auction ended");
+
+            let maxClaimTokens;
+            maxClaimTokens = new BigNumber(maxClaimTokens); // maxclaim tokens not giving the right results have to debug it
+
         })
 
         it('accounts[1] should be able to claim tokens after locking presale contract', async function () {
-            let Priceconstant =  await auctionContract.priceConstant();
-            console.log("Priceconstant",Priceconstant)
-            let calimedStatus = await auctionContract.calimedStatus(accounts[1]);
+            let bidTokens;
+            let totalTokens;
+
+            let calimedStatus = await auctionContract.claimedStatus(accounts[1]);
             let locked = await presaleContract.lockRecords();
             let stage = await auctionContract.stage()
 
+            assert.equal(locked, true, "Presale record migration should be locked before claiming")
             assert.equal(calimedStatus, false, "Clalimed status should be false")
             assert.equal(stage, 3, "Stage should be claiming started")
 
-            let bids = await auctionContract.bids.call(accounts[1])
-            console.log("bids", bids / tokenPrice *10^18)
-
-            assert.equal(locked, true, "Presale record migration should be locked before claiming")
-
+            bids = await auctionContract.bids.call(accounts[1])
             await auctionContract.claimTokens({ from: accounts[1] })
             let fundsClaimed = await auctionContract.fundsClaimed.call();
-            console.log("fundsClaimed",fundsClaimed)
+            assert.equal(bids.toNumber(),fundsClaimed.toNumber(),"fundsClaimed and the bids should be equal");
+
+            bids = new BigNumber(bids);
+            bidTokens = bids.dividedBy(tokenPrice).multipliedBy(WEI)
+            bidTokens = new BigNumber(bidTokens)
+            totalTokens = bidTokens.multipliedBy(0.32).plus(bidTokens)
+
+            let calTokens = HARDCAP/CEILING;
+            let calbonusTokens = 0.32 * calTokens;
+            allTokens = (calbonusTokens+calTokens)*WEI;
+            allTokens = new BigNumber(allTokens)
+            assert.equal(allTokens, totalTokens.toNumber(),"Calculated tokens bid tokens should be equal")
+
+            let account1Balance = await tokenContract.balanceOf(accounts[1]);
+
+            let swap = new BigNumber(20000*WEI)
+            let presale = new BigNumber(303000000000000000000);
+            acc1Balance = (swap).plus(presale).plus(allTokens)
+
+            assert.equal(acc1Balance.toNumber(),account1Balance.toNumber(),"actual balance and total balance calculated should be equal for account1")
 
         })
 
+        it('Account1 should be able to transfer tokens to account2', async function() {
+            let account2bal = await tokenContract.balanceOf(accounts[2]);
+            assert.equal(account2bal.toNumber(),0,"balance should be 0");
+            await tokenContract.transfer(accounts[2],FIN)
+            account2bal = await tokenContract.balanceOf(accounts[2]);
+            assert.equal(account2bal.toNumber(),FIN,"Account2 balance should be equal to fin");
+        })
+
+        it('Should approve timelock tokens to transfer tokens', async function() {
+            await tokenContract.approve(timeLockContract.address,FIN,{from:accounts[2]})
+            let allowance = await tokenContract.allowance.call(accounts[2],timeLockContract.address)
+            assert.equal(allowance.toNumber(),FIN,"account2 should allow timelock tokens to lock and transfer tokens")
+        })
+
+        it('Should lock tokens for 10 secs', async function() {
+            await timeLockContract.timeLockTokens(10,{from:accounts[2]});
+            balance = await tokenContract.balanceOf.call(timeLockContract.address);
+            assert.equal(balance.toNumber(),FIN,"Transferred balance should be updated");
+            acc2balance = await tokenContract.balanceOf.call(accounts[2]);
+            assert.equal(acc2balance.toNumber(),0,"Account2 balance should be zero after locking tokens");
+        })
+
+        it(" Should reject timelock release before 10 seconds", async function() {
+            await timeLockContract.tokenRelease({from:accounts[2]}).should.be.rejected;
+        })
+
+        it(" Should release tokens after 10 seconds", async function() {
+            await timeout(10000);
+            await timeLockContract.tokenRelease({from:accounts[2]})
+            var balance = await tokenContract.balanceOf.call(accounts[2])
+            assert.equal(balance.toNumber(),FIN,"Account2 should get the tokens back after releasing")
+        })
+
+        it('Before end claim owner should be able to transfer only remaining tokens', async function() {
+            let stage = await auctionContract.stage()
+            assert.equal(stage, 4 , "Stage should be auction ended");
+            await auctionContract.recoverTokens(tokenContract.address);
+        })
+
+        it('Should be able to end claim and recover the leftover tokens', async function() {
+            await auctionContract.endClaim()
+            stage = await auctionContract.stage()
+            assert.equal(stage, 5 , "Stage should be auction ended");
+
+            await auctionContract.recoverTokens(tokenContract.address);
+            let ownerBal = await tokenContract.balanceOf(accounts[0]);
+        })
+
+        it('Should start migration by owner', async function() {
+            await tokenContract.startMigration({from:accounts[1]}).should.be.rejected;
+            await tokenContract.startMigration() //default account is accounts[0] that is the owner
+            let acc3Bal = await tokenContract.balanceOf(accounts[3]);
+            assert.equal(acc3Bal.toNumber(),0,"Account3 balance should be 0");
+            await tokenContract.transfer(accounts[3],FIN,{from:accounts[2]}).should.be.rejected;
+        })
     });
 });
 
