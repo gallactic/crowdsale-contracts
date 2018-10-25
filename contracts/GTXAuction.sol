@@ -351,7 +351,7 @@ contract GTXAuction is Ownable {
         bids[_receiver] = bids[_receiver].add(msg.value);
 
         uint256 maxAcctClaim = bids[_receiver].mul(WEI_FACTOR).div(calcTokenPrice(endBlock)); // max claimable tokens given bids total amount
-        maxAcctClaim = bonusPercent[10].mul(maxAcctClaim).div(100); // max claimable tokens (including bonus)
+        maxAcctClaim = maxAcctClaim.add(bonusPercent[10].mul(maxAcctClaim).div(100)); // max claimable tokens (including bonus)
         maxTotalClaim = maxTotalClaim.add(maxAcctClaim); // running total of max claim liability
 
         totalReceived = totalReceived.add(msg.value);
