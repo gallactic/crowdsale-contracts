@@ -326,6 +326,7 @@ contract GTXAuction is Ownable {
         onlyOwner
         atStage(Stages.ClaimingStarted)
     {
+        require(block.number >= endBlock.add(biddingPeriod),"Owner can end claim only after 3 months");   //Owner can force end the claim only after 3 months. This is to protect the owner from ending the claim before users could claim
         // set the stage to Claiming Ended
         stage = Stages.ClaimingEnded;
     }
@@ -336,7 +337,6 @@ contract GTXAuction is Ownable {
         public
         payable
         timedTransitions
-        onlyWhitelisted(_receiver)
         atStage(Stages.AuctionStarted)
     {
         require(msg.value > 0, "bid must be larger than 0");
