@@ -340,6 +340,7 @@ contract GTXAuction is Ownable {
         atStage(Stages.AuctionStarted)
     {
         require(msg.value > 0, "bid must be larger than 0");
+        require(block.number <= endBlock ,"Auction has ended");
         if (_receiver == 0x0) {
             _receiver = msg.sender;
         }
@@ -357,7 +358,7 @@ contract GTXAuction is Ownable {
         totalReceived = totalReceived.add(msg.value);
 
         remainingCap = hardCap.sub(totalReceived);
-        if(remainingCap == 0){
+        if(remainingCap == 0 || block.number == endBlock){
             finalizeAuction(); // When maxWei is equal to the hardcap the auction will end and finalizeAuction is triggered.
         }
         assert(totalReceived >= msg.value);
@@ -427,11 +428,10 @@ contract GTXAuction is Ownable {
         stage = Stages.AuctionEnded;
         if (block.number < endBlock){
             finalPrice = calcTokenPrice(block.number);
+            endBlock = block.number;
         } else {
-            finalPrice = calcTokenPrice(block.number);
+            finalPrice = calcTokenPrice(endBlock);
         }
-
-        endBlock = block.number;
     }
 
     /// @dev calculates the bonus for the total bids
