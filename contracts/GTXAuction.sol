@@ -113,10 +113,7 @@ contract GTXAuction is Ownable {
     }
 
     modifier timedTransitions() {
-        if (stage == Stages.AuctionStarted && block.number >= endBlock.add(waitingPeriod)) {
-            finalizeAuction();
-            stage = Stages.ClaimingStarted;
-        }
+
         if (stage == Stages.AuctionEnded && block.number >= endBlock.add(waitingPeriod)) {
             stage = Stages.ClaimingStarted;
         }
@@ -340,29 +337,33 @@ contract GTXAuction is Ownable {
         atStage(Stages.AuctionStarted)
     {
         require(msg.value > 0, "bid must be larger than 0");
-        require(block.number <= endBlock ,"Auction has ended");
-        if (_receiver == 0x0) {
-            _receiver = msg.sender;
+        bool isEnded = block.number > endBlock;
+        if(!isEnded) {
+            if (_receiver == 0x0) {
+                _receiver = msg.sender;
+            }
+            assert(bids[_receiver].add(msg.value) >= msg.value);
+
+            uint256 maxWei = hardCap.sub(totalReceived); // remaining accetable funds without the current bid value
+            require(msg.value <= maxWei, "Hardcap limit will be exceeded");
+
+            bids[_receiver] = bids[_receiver].add(msg.value);
+
+            uint256 maxAcctClaim = bids[_receiver].mul(WEI_FACTOR).div(calcTokenPrice(endBlock)); // max claimable tokens given bids total amount
+            maxAcctClaim = maxAcctClaim.add(bonusPercent[10].mul(maxAcctClaim).div(100)); // max claimable tokens (including bonus)
+            maxTotalClaim = maxTotalClaim.add(maxAcctClaim); // running total of max claim liability
+
+            totalReceived = totalReceived.add(msg.value);
+
+            remainingCap = hardCap.sub(totalReceived);
+            if(remainingCap == 0 || block.number == endBlock){
+                finalizeAuction(); // When maxWei is equal to the hardcap the auction will end and finalizeAuction is triggered.
+            }
+            assert(totalReceived >= msg.value);
+            emit BidSubmission(_receiver, msg.value);
+        }else{
+            finalizeAuction();
         }
-        assert(bids[_receiver].add(msg.value) >= msg.value);
-
-        uint256 maxWei = hardCap.sub(totalReceived); // remaining accetable funds without the current bid value
-        require(msg.value <= maxWei, "Hardcap limit will be exceeded");
-
-        bids[_receiver] = bids[_receiver].add(msg.value);
-
-        uint256 maxAcctClaim = bids[_receiver].mul(WEI_FACTOR).div(calcTokenPrice(endBlock)); // max claimable tokens given bids total amount
-        maxAcctClaim = maxAcctClaim.add(bonusPercent[10].mul(maxAcctClaim).div(100)); // max claimable tokens (including bonus)
-        maxTotalClaim = maxTotalClaim.add(maxAcctClaim); // running total of max claim liability
-
-        totalReceived = totalReceived.add(msg.value);
-
-        remainingCap = hardCap.sub(totalReceived);
-        if(remainingCap == 0 || block.number == endBlock){
-            finalizeAuction(); // When maxWei is equal to the hardcap the auction will end and finalizeAuction is triggered.
-        }
-        assert(totalReceived >= msg.value);
-        emit BidSubmission(_receiver, msg.value);
     }
 
     /// @dev Claims tokens for bidder after auction.

@@ -476,17 +476,19 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             it('Should end the bid at end block', async function () {
 
                 let currentBlock = await web3.eth.getBlockNumber();
-                endBlock = endBlock.toNumber() -1
-
+                endBlock = endBlock.toNumber()
+                console.log("endBlock",endBlock)
                 for (i = currentBlock; i < endBlock; i++) {
                     await auctionContract.startAuction().should.be.rejected; //dummy transaction to increase block number
                 }
+                currentBlock = await web3.eth.getBlockNumber();
+                console.log("currentBlock",currentBlock)
                 await auctionContract.bid(accounts[1], {
                     from: accounts[2],
                     value: web3.utils.toBN(5 * WEI)
                 });
                 let remainingCap = await auctionContract.remainingCap()
-                assert.equal(remainingCap.toNumber(),495 * WEI, "remaining cap should be equal to 495");
+                assert.equal(remainingCap.toNumber(),500 * WEI, "remaining cap should be equal to 495");
             })
 
             it('Should validate the token price and stage', async function () {
@@ -494,10 +496,20 @@ contract('Tests for GTX Auction contract ', function (accounts) {
                 tokenPrice = new BigNumber(tokenPrice);
                 tokenPrice = tokenPrice.multipliedBy(ETHER_PRICE)
                 tokenPrice = tokenPrice.dividedBy(WEI);
+                console.log("tokenPrice",tokenPrice)
                 assert.equal(Number(tokenPrice).toFixed(1), FLOOR, "Token price should be 33 cents")
 
                 let stage = await auctionContract.stage()
                 assert.equal(stage, AUCTION_ENDED, "Stage should be auction ended");
+            })
+
+            it('Should recover the remaining tokens', async function() {
+                let aucBal = await tokenContract.balanceOf(auctionContract.address);
+                aucBal = new BigNumber(aucBal)
+                maxTotalClaim = await auctionContract.maxTotalClaim()
+                await auctionContract.recoverTokens(tokenContract.address)
+                aucBal = await tokenContract.balanceOf(auctionContract.address);
+                console.log("aucBal1",aucBal)
             })
         })
     })
