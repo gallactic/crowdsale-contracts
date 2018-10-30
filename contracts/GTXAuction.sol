@@ -46,7 +46,8 @@ contract GTXAuction is Ownable {
      */
     event Setup(uint256 etherPrice, uint256 hardCap, uint256 ceiling, uint256 floor, uint256[] bonusThreshold, uint256[] bonusPercent);
     event BidSubmission(address indexed sender, uint256 amount);
-    event ClaimedTokens(address indexed recipient, uint sent_amount);
+    event ClaimedTokens(address indexed recipient, uint256 sent_amount);
+    event Collected(address collector, uint256 amount);
 
     /*
      *  Storage
@@ -331,6 +332,12 @@ contract GTXAuction is Ownable {
         require(block.number >= endBlock.add(biddingPeriod),"Owner can end claim only after 3 months");   //Owner can force end the claim only after 3 months. This is to protect the owner from ending the claim before users could claim
         // set the stage to Claiming Ended
         stage = Stages.ClaimingEnded;
+    }
+
+    // Owner can collect ETH any number of times
+    function collect() external onlyOwner returns (bool) {
+        msg.sender.transfer(address(this).balance);
+        emit Collected(msg.sender, address(this).balance);
     }
 
     /// @dev Allows to send a bid to the auction.
