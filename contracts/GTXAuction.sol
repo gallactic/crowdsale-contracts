@@ -122,9 +122,6 @@ contract GTXAuction is Ownable {
             stage = Stages.ClaimingStarted;
         }
         _;
-        if(stage == Stages.AuctionEnded && fundsClaimed == totalReceived) {
-            stage = Stages.ClaimingEnded;
-        }
     }
 
     modifier onlyWhitelisted(address _participant) {
@@ -185,9 +182,13 @@ contract GTXAuction is Ownable {
     * @param _token address of the ERC20 contract
     */
     function recoverTokens(ERC20Interface _token) external onlyOwner {
-        require(uint(stage) >= 3, "auction bidding must be ended to recover");
-        if(currentStage() == 3 || currentStage() == 4) {
-            _token.transfer(owner(), _token.balanceOf(address(this)).sub(maxTotalClaim));
+        if(address(_token) == address(ERC20)) {
+            require(uint(stage) >= 3, "auction bidding must be ended to recover");
+            if(currentStage() == 3 || currentStage() == 4) {
+                _token.transfer(owner(), _token.balanceOf(address(this)).sub(maxTotalClaim));
+            } else {
+                _token.transfer(owner(), _token.balanceOf(address(this)));
+            }
         } else {
             _token.transfer(owner(), _token.balanceOf(address(this)));
         }
