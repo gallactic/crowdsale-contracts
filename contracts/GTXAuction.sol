@@ -36,11 +36,6 @@ import "./ERC20Interface.sol";
 contract GTXAuction is Ownable {
     using SafeMath for uint256;
 
-    // Map of whitelisted address for participation in the Auction
-    mapping (address => bool) public whitelist;
-    // Current number of participants in the Auction
-    uint256 public participants;
-
     /*
      *  Events
      */
@@ -48,6 +43,7 @@ contract GTXAuction is Ownable {
     event BidSubmission(address indexed sender, uint256 amount);
     event ClaimedTokens(address indexed recipient, uint256 sent_amount);
     event Collected(address collector, uint256 amount);
+    event SetMultiSigAddress(address owner,address multiSigAddress);
 
     /*
      *  Storage
@@ -79,12 +75,19 @@ contract GTXAuction is Ownable {
     uint256 public priceConstant; // price calculation factor to generate the price curve per block
     uint256 public finalPrice; // the final Bid Price achieved
     uint256 constant public WEI_FACTOR = 10**18; // wei conversion factor
+    
+    //generic variables 
+    uint256 public participants; // number of participants in the Auction
+    address public multiSigAddress; // a multisignature contract address to keep the auction funds
 
     // Auction maps to calculate Bids and Bonuses
     mapping (address => uint256) public bids; // total bids in wei per account
     mapping (address => uint256) public bidTokens; // tokens calculated for the submitted bids
     mapping (address => uint256) public totalTokens; // total tokens is the accumulated tokens of bidTokens, presaleTokens, gtxrecordTokens and bonusTokens
     mapping (address => bool) public claimedStatus; // claimedStatus is the claimed status of the user
+
+    // Map of whitelisted address for participation in the Auction
+    mapping (address => bool) public whitelist;
 
     // Auction arrays for bid amount based Bonus calculation
     uint256[11] public bonusPercent; // 11 possible bonus percentages (with values 0 - 100 each)
@@ -334,10 +337,22 @@ contract GTXAuction is Ownable {
         stage = Stages.ClaimingEnded;
     }
 
+    /// @dev setup multisignature address to keep the funds safe
+    /// @param _multiSigAddress is the multisignature contract address
+    /// @return true if the address was set successfully  
+    function setMultiSigAddress(address _multiSigAddress) external onlyOwner returns(bool){
+        require(_multiSigAddress != address(0), "not a valid multisignature address");
+        multiSigAddress = _multiSigAddress;
+        emit SetMultiSigAddress(msg.sender,multiSigAddress);
+        return true;
+    }
+
     // Owner can collect ETH any number of times
     function collect() external onlyOwner returns (bool) {
-        msg.sender.transfer(address(this).balance);
+        require(multiSigAddress != address(0), "multisignature address is not set");
+        multiSigAddress.transfer(address(this).balance);
         emit Collected(msg.sender, address(this).balance);
+        return true;
     }
 
     /// @dev Allows to send a bid to the auction.

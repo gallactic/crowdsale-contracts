@@ -31,7 +31,7 @@ let totalSwapWei;
 const multiSigWallet = '0xff5f6a455eb48b3475d11a6db686935aaa36d31c';
 
 contract('Tests for GTX Auction contract ', function (accounts) {
-
+    const multiSigAddress = "0xbc324446023e9315E275a184Ec47ac8B7dC8f8a7"
     const WEI = web3.utils.toWei(web3.utils.toBN(1), "ether"); // Conversion of ETHER to WEI
 
     // GTX Swap Constants
@@ -406,6 +406,20 @@ contract('Tests for GTX Auction contract ', function (accounts) {
                 from: accounts[2]
             }).should.be.rejected;
         })
+
+        it('Adding tests to withdraw funds', async function() {
+            hardCap = await auctionContract.hardCap();
+            let auctionBalance = await web3.eth.getBalance(auctionContract.address);
+            assert.equal(auctionBalance,hardCap.toNumber(),"Auction balance should be equal to hardcap")
+        
+            await auctionContract.collect().should.be.rejected;
+            await auctionContract.setMultiSigAddress("0x0000000000000000000000000000000000000000").should.be.rejected;
+            await auctionContract.setMultiSigAddress(accounts[0]);
+            await auctionContract.collect()
+
+            auctionBalance = await web3.eth.getBalance(auctionContract.address);            
+            assert.equal(auctionBalance,0,"Auction balance should be 0 ")
+        })
     });
 
     /***
@@ -477,12 +491,10 @@ contract('Tests for GTX Auction contract ', function (accounts) {
 
                 let currentBlock = await web3.eth.getBlockNumber();
                 endBlock = endBlock.toNumber()
-                console.log("endBlock",endBlock)
                 for (i = currentBlock; i < endBlock; i++) {
                     await auctionContract.startAuction().should.be.rejected; //dummy transaction to increase block number
                 }
                 currentBlock = await web3.eth.getBlockNumber();
-                console.log("currentBlock",currentBlock)
                 await auctionContract.bid(accounts[1], {
                     from: accounts[2],
                     value: web3.utils.toBN(5 * WEI)
@@ -496,7 +508,6 @@ contract('Tests for GTX Auction contract ', function (accounts) {
                 tokenPrice = new BigNumber(tokenPrice);
                 tokenPrice = tokenPrice.multipliedBy(ETHER_PRICE)
                 tokenPrice = tokenPrice.dividedBy(WEI);
-                console.log("tokenPrice",tokenPrice)
                 assert.equal(Number(tokenPrice).toFixed(1), FLOOR, "Token price should be 33 cents")
 
                 let stage = await auctionContract.stage()
@@ -509,7 +520,6 @@ contract('Tests for GTX Auction contract ', function (accounts) {
                 maxTotalClaim = await auctionContract.maxTotalClaim()
                 await auctionContract.recoverTokens(tokenContract.address)
                 aucBal = await tokenContract.balanceOf(auctionContract.address);
-                console.log("aucBal1",aucBal)
             })
         })
     })
