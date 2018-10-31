@@ -41,9 +41,9 @@ contract GTXAuction is Ownable {
      */
     event Setup(uint256 etherPrice, uint256 hardCap, uint256 ceiling, uint256 floor, uint256[] bonusThreshold, uint256[] bonusPercent);
     event BidSubmission(address indexed sender, uint256 amount);
-    event ClaimedTokens(address indexed recipient, uint256 sent_amount);
-    event Collected(address collector, uint256 amount);
-    event SetMultiSigAddress(address owner,address multiSigAddress);
+    event ClaimedTokens(address indexed recipient, uint256 sentAmount);
+    event Collected(address collector, address multiSigAddress, uint256 amount);
+    event SetMultiSigAddress(address owner, address multiSigAddress);
 
     /*
      *  Storage
@@ -76,8 +76,8 @@ contract GTXAuction is Ownable {
     uint256 public finalPrice; // the final Bid Price achieved
     uint256 constant public WEI_FACTOR = 10**18; // wei conversion factor
     
-    //generic variables 
-    uint256 public participants; // number of participants in the Auction
+    //generic variables
+    uint256 participants; 
     address public multiSigAddress; // a multisignature contract address to keep the auction funds
 
     // Auction maps to calculate Bids and Bonuses
@@ -139,7 +139,7 @@ contract GTXAuction is Ownable {
     /// @param _gtxRecord the GTX Record contract address
     /// @param _gtxPresale the GTX presale contract address
     /// @param _biddingPeriod the number of blocks the bidding period of the auction will run - Initial decision of 524160 (~91 Days)
-    /// @param _waitingPeriod the waiting period post Auction End before claiming - Initial decision of 80640 (-14 days)
+    /// @param _waitingPeriod the waiting period post Auction End before claiming - Initial decision of 172800 (-30 days)
 
 
     constructor (
@@ -204,7 +204,6 @@ contract GTXAuction is Ownable {
         for (uint32 i = 0; i < _bidder_addresses.length; i++) {
             if(_bidder_addresses[i] != address(0) && whitelist[_bidder_addresses[i]] == false){
                 whitelist[_bidder_addresses[i]] = true;
-                participants = participants.add(1);
             }
         }
     }
@@ -215,7 +214,6 @@ contract GTXAuction is Ownable {
         for (uint32 i = 0; i < _bidder_addresses.length; i++) {
             if(_bidder_addresses[i] != address(0) && whitelist[_bidder_addresses[i]] == true){
                 whitelist[_bidder_addresses[i]] = false;
-                participants = participants.sub(1);
             }
         }
     }
@@ -297,7 +295,7 @@ contract GTXAuction is Ownable {
         atStage(Stages.AuctionSetUp)
     {
         require(_etherPrice > 0,"Ether price should be > 0");
-        require(_hardCap > 0,"Hard Cap should be > 0 ");
+        require(_hardCap > 0,"Hard Cap should be > 0");
         require(_floor < _ceiling,"floor must be strictly less than the ceiling");
         require(_bonusPercent.length == _bonusThreshold.length, "Length of bonus percent array and bonus threshold should be equal");
         etherPrice = _etherPrice;
@@ -332,7 +330,7 @@ contract GTXAuction is Ownable {
         onlyOwner
         atStage(Stages.ClaimingStarted)
     {
-        require(block.number >= endBlock.add(biddingPeriod),"Owner can end claim only after 3 months");   //Owner can force end the claim only after 3 months. This is to protect the owner from ending the claim before users could claim
+        require(block.number >= endBlock.add(biddingPeriod), "Owner can end claim only after 3 months");   //Owner can force end the claim only after 3 months. This is to protect the owner from ending the claim before users could claim
         // set the stage to Claiming Ended
         stage = Stages.ClaimingEnded;
     }
@@ -351,7 +349,7 @@ contract GTXAuction is Ownable {
     function collect() external onlyOwner returns (bool) {
         require(multiSigAddress != address(0), "multisignature address is not set");
         multiSigAddress.transfer(address(this).balance);
-        emit Collected(msg.sender, address(this).balance);
+        emit Collected(msg.sender, multiSigAddress, address(this).balance);
         return true;
     }
 
@@ -372,17 +370,17 @@ contract GTXAuction is Ownable {
 
         uint256 maxWei = hardCap.sub(totalReceived); // remaining accetable funds without the current bid value
         require(msg.value <= maxWei, "Hardcap limit will be exceeded");
-
+        participants = participants.add(1);
         bids[_receiver] = bids[_receiver].add(msg.value);
 
-        uint256 maxAcctClaim = bids[_receiver].div(calcTokenPrice(endBlock)).mul(WEI_FACTOR); // max claimable tokens given bids total amount
+        uint256 maxAcctClaim = bids[_receiver].mul(WEI_FACTOR).div(calcTokenPrice(endBlock)); // max claimable tokens given bids total amount
         maxAcctClaim = maxAcctClaim.add(bonusPercent[10].mul(maxAcctClaim).div(100)); // max claimable tokens (including bonus)
         maxTotalClaim = maxTotalClaim.add(maxAcctClaim); // running total of max claim liability
 
         totalReceived = totalReceived.add(msg.value);
 
         remainingCap = hardCap.sub(totalReceived);
-        if(remainingCap == 0 || block.number == endBlock){
+        if(remainingCap == 0){
             finalizeAuction(); // When maxWei is equal to the hardcap the auction will end and finalizeAuction is triggered.
         }
         assert(totalReceived >= msg.value);
@@ -410,8 +408,8 @@ contract GTXAuction is Ownable {
         bids[msg.sender] = 0;
         totalTokens[msg.sender] = 0;
 
-        require(ERC20.transfer(msg.sender, accumulatedTokens), "transfer failed");
         claimedStatus[msg.sender] = true;
+        require(ERC20.transfer(msg.sender, accumulatedTokens), "transfer failed");
 
         emit ClaimedTokens(msg.sender, accumulatedTokens);
         assert(bids[msg.sender] == 0);
