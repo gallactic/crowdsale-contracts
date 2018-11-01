@@ -77,7 +77,7 @@ contract GTXAuction is Ownable {
     uint256 constant public WEI_FACTOR = 10**18; // wei conversion factor
     
     //generic variables
-    uint256 participants; 
+    uint256 public participants; 
     address public multiSigAddress; // a multisignature contract address to keep the auction funds
 
     // Auction maps to calculate Bids and Bonuses

@@ -263,6 +263,8 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             assert.equal(totalReceived.toNumber(), hardCap, "Total received should be equal to hardcap")
             let remainingCap = await auctionContract.remainingCap()
             assert.equal(remainingCap.toNumber(), 0, "remaining cap should be equal to 0");
+            let participants = await auctionContract.participants.call();
+            assert.equal(participants.toNumber(), 1 , "whitelisted accounts should be equal no of participants ")
         })
 
         it('MaxAccountClaim should add the bidTokens after bid', async function () {
@@ -291,16 +293,12 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             await auctionContract.addToWhitelist([accounts[1], accounts[2], accounts[3], accounts[4], accounts[16], accounts[17], accounts[18], accounts[19]]);
             let isWhitelisted = await auctionContract.whitelist(accounts[19]);
             assert.equal(isWhitelisted, true, "accounts[19] should be whitelisted")
-            let participants = await auctionContract.participants.call();
-            assert.equal(participants.toNumber(), 8, "whitelisted accounts should be equal no of participants ")
         })
 
         it('Should remove from whitelist', async function () {
             await auctionContract.removeFromWhitelist([accounts[19]]);
             let isWhitelisted = await auctionContract.whitelist(accounts[19]);
             assert.equal(isWhitelisted, false, "accounts[19] should be whitelisted")
-            let participants = await auctionContract.participants.call();
-            assert.equal(participants.toNumber(), 7, "whitelisted accounts should be equal no of participants ")
         })
 
         it('Should validate the token price and stage', async function () {
