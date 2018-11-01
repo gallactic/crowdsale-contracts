@@ -156,10 +156,10 @@ contract('Tests for GTX Auction contract ', function (accounts) {
     describe('GTX Auction contract tests', function () {
         let acc1Balance;
         acc1Balance = new BigNumber(acc1Balance);
-        let swtokens;
-        swtokens = new BigNumber(swtokens);
-        let prtokens;
-        prtokens = new BigNumber(prtokens);
+        let swaptokens;
+        swaptokens = new BigNumber(swaptokens);
+        let presaletokens;
+        presaletokens = new BigNumber(presaletokens);
         let maxTotalClaim;
         maxTotalClaim = new BigNumber(maxTotalClaim);
         let totalTokens;
@@ -178,11 +178,11 @@ contract('Tests for GTX Auction contract ', function (accounts) {
         });
 
         it('Max tokens should be equal to gtx record toatal and presale total', async function () {
-            swtokens = await recordContract.totalClaimableGTX()
-            prtokens = await presaleContract.totalPresaleTokens()
+            swaptokens = await recordContract.maxRecords()
+            presaletokens = await presaleContract.totalPresaleTokens()
 
             maxTotalClaim = await auctionContract.maxTotalClaim()
-            maxClaimableTokens = prtokens.plus(swtokens);
+            maxClaimableTokens = presaletokens.plus(swaptokens);
             maxClaimableTokens = new BigNumber(maxClaimableTokens);
             assert.equal(maxClaimableTokens, maxTotalClaim.toNumber())
         })
@@ -211,7 +211,7 @@ contract('Tests for GTX Auction contract ', function (accounts) {
 
             let maxtokens = await auctionContract.maxTokens()
             maxtokens = new BigNumber(maxtokens)
-            calcAuctionTokens = swtokens.plus(prtokens).plus(maxtokens);
+            calcAuctionTokens = swaptokens.plus(presaletokens).plus(maxtokens);
             calcAuctionTokens = new BigNumber(calcAuctionTokens)
             let auctionContractBalance = await tokenContract.balanceOf(auctionContract.address);
             assert.equal(calcAuctionTokens, auctionContractBalance.toNumber(),
@@ -385,7 +385,7 @@ contract('Tests for GTX Auction contract ', function (accounts) {
         })
 
         it(" Should release tokens after 10 seconds", async function () {
-            await timeout(1000);
+            await timeout(1100);
             await timeLockContract.tokenRelease({
                 from: accounts[2]
             })
@@ -446,11 +446,11 @@ contract('Tests for GTX Auction contract ', function (accounts) {
             let endBlock;
 
             it('Max tokens should be equal to gtx record toatal and presale total', async function () {
-                swtokens = await recordContract.totalClaimableGTX()
-                prtokens = await presaleContract.totalPresaleTokens()
+                swaptokens = await recordContract.maxRecords()
+                presaletokens = await presaleContract.totalPresaleTokens()
 
                 maxTotalClaim = await auctionContract.maxTotalClaim()
-                maxClaimableTokens = prtokens.plus(swtokens);
+                maxClaimableTokens = presaletokens.plus(swaptokens);
                 maxClaimableTokens = new BigNumber(maxClaimableTokens);
                 assert.equal(maxClaimableTokens, maxTotalClaim.toNumber())
             })
