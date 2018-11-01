@@ -157,18 +157,13 @@ contract GTXAuction is Ownable {
         require(_biddingPeriod > 0, "The bidding period must be a minimum 1 block");
         require(_waitingPeriod > 0, "The waiting period must be a minimum 1 block");
 
-        // validate that this contract's GTXRecord has been locked - true
-        require(_gtxRecord.lockRecords(), "Records have not been locked");
-        // validate that this contract's GTXRecord is the same deployment referenced by the ERC20 token contract
-        require(address(_gtxRecord) == _gtxToken.getGTXRecord(), "Incorrect Record address provided");
-
         ERC20 = _gtxToken;
         gtxRecord = _gtxRecord;
         gtxPresale = _gtxPresale;
         waitingPeriod = _waitingPeriod;
         biddingPeriod = _biddingPeriod;
 
-        uint256 gtxSwapTokens = gtxRecord.totalClaimableGTX();
+        uint256 gtxSwapTokens = gtxRecord.maxRecords();
         uint256 gtxPresaleTokens = gtxPresale.totalPresaleTokens();
         maxTotalClaim = maxTotalClaim.add(gtxSwapTokens).add(gtxPresaleTokens);
 
@@ -395,6 +390,8 @@ contract GTXAuction is Ownable {
         atStage(Stages.ClaimingStarted)
     {
         require(!claimedStatus[msg.sender], "User already claimed");
+        // validate that GTXRecord contract has been locked - set to true
+        require(gtxRecord.lockRecords(), "gtx records record updating must be locked");
         // validate that GTXPresale contract has been locked - set to true
         require(gtxPresale.lockRecords(), "presale record updating must be locked");
 

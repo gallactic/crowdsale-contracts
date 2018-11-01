@@ -182,10 +182,8 @@ contract GTXToken is StandardToken, Ownable{
     */
 
     function passAuctionAllocation(uint256 _auctionAllocation) public onlyAuction {
-        //check GTX Record creation has stopped.
-        require(gtxRecord.lockRecords() == true, "GTXRecord contract lock state should be true");
 
-        uint256 gtxRecordTotal = gtxRecord.totalClaimableGTX();
+        uint256 gtxRecordTotal = gtxRecord.maxRecords();
         uint256 gtxPresaleTotal = gtxPresale.totalPresaleTokens();
 
         totalAllocation = _auctionAllocation.add(gtxRecordTotal).add(gtxPresaleTotal);
